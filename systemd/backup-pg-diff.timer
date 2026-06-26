@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily pgBackRest DIFF
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+Unit=backup-pg@diff.service
+
+[Install]
+WantedBy=timers.target

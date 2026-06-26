@@ -1,0 +1,10 @@
+[Unit]
+Description=pgBackRest backup (%i)
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=__BACKUP_USER__
+Group=__BACKUP_USER__
+Environment=HOME=/home/__BACKUP_USER__
+ExecStart=/opt/backup/bin/pg-backup.sh %i

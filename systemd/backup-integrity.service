@@ -1,0 +1,7 @@
+[Unit]
+Description=Backup integrity check
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/backup/bin/integrity-check.sh

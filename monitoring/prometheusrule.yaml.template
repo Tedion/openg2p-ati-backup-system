@@ -1,0 +1,95 @@
+# Rendered by install.sh: __BACKUP_INSTANCE__ and __PG_INSTANCE__ are replaced from backup.env.
+# kubectl apply the result (namespace monitoring; kube-prometheus-stack ruleSelector picks it up).
+# CRITICAL: the cluster pushgateway does NOT honor pushed labels, so metrics pushed with
+# job=backup/instance=<x> arrive as exported_job/exported_instance. Select on those.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: backup-system-__BACKUP_INSTANCE__
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  groups:
+  - name: backup-__BACKUP_INSTANCE__
+    rules:
+    - alert: BackupRunMissed
+      expr: (time() - max(master_backup_last_success_timestamp{exported_instance="__BACKUP_INSTANCE__"})) > (26 * 3600)
+      for: 15m
+      labels: {component: backup, severity: critical}
+      annotations:
+        summary: "Backup (__BACKUP_INSTANCE__) has not succeeded in >26h"
+        description: "Last successful master backup was {{ $value | humanizeDuration }} ago."
+    - alert: BackupRunFailed
+      expr: master_backup_failure_count{exported_instance="__BACKUP_INSTANCE__"} > 0
+      for: 5m
+      labels: {component: backup, severity: critical}
+      annotations:
+        summary: "Backup run had {{ $value }} failed source(s)"
+        description: "Check journalctl -u backup-master on the backup host."
+    - alert: BackupSourceFailed
+      expr: backup_status{exported_instance="__BACKUP_INSTANCE__"} == 0
+      for: 5m
+      labels: {component: backup, severity: critical}
+      annotations:
+        summary: "Backup source {{ $labels.backup_type }} failed"
+        description: "backup_status for {{ $labels.backup_type }} is 0."
+    - alert: BackupDiskLow
+      expr: backup_disk_space_available_bytes{exported_instance="__BACKUP_INSTANCE__"} < (25 * 1024 * 1024 * 1024)
+      for: 10m
+      labels: {component: backup, severity: warning}
+      annotations:
+        summary: "Backup host <25GiB free"
+        description: "Available={{ $value | humanize1024 }}B."
+    - alert: BackupDiskCritical
+      expr: backup_disk_space_available_bytes{exported_instance="__BACKUP_INSTANCE__"} < (10 * 1024 * 1024 * 1024)
+      for: 5m
+      labels: {component: backup, severity: critical}
+      annotations:
+        summary: "Backup host <10GiB free, backups will fail"
+        description: "Free space critically low."
+    - alert: BackupMetricsAbsent
+      expr: absent(master_backup_last_success_timestamp{exported_instance="__BACKUP_INSTANCE__"})
+      for: 2h
+      labels: {component: backup, severity: warning}
+      annotations:
+        summary: "No backup metrics in Prometheus"
+        description: "Pushgateway lost data or master-backup.sh stopped running."
+  - name: pg-wal-__PG_INSTANCE__
+    rules:
+    - alert: WALArchiveStalled
+      expr: pg_archiver_last_archive_age_seconds{exported_instance="__PG_INSTANCE__"} > 1800
+      for: 10m
+      labels: {component: backup, severity: critical}
+      annotations:
+        summary: "Postgres WAL archiving stalled (>30m)"
+        description: "Last WAL archived {{ $value | humanizeDuration }} ago. If this persists, pg_wal fills the disk and Postgres STOPS."
+    - alert: WALArchiveFailing
+      expr: increase(pg_archiver_failed_count{exported_instance="__PG_INSTANCE__"}[15m]) > 0
+      for: 5m
+      labels: {component: backup, severity: critical}
+      annotations:
+        summary: "Postgres WAL archive failures"
+        description: "archive-push failing. WAL will accumulate and risk a disk-full prod outage."
+    - alert: WALDirGrowing
+      expr: pg_wal_size_bytes{exported_instance="__PG_INSTANCE__"} > (20 * 1024 * 1024 * 1024)
+      for: 15m
+      labels: {component: backup, severity: warning}
+      annotations:
+        summary: "Postgres pg_wal >20GiB"
+        description: "WAL building up ({{ $value | humanize1024 }}B)."
+    - alert: WALDirCritical
+      expr: pg_wal_size_bytes{exported_instance="__PG_INSTANCE__"} > (45 * 1024 * 1024 * 1024)
+      for: 5m
+      labels: {component: backup, severity: critical}
+      annotations:
+        summary: "Postgres pg_wal >45GiB, disk-full prod outage imminent"
+        description: "Fix archiving NOW or set archive_command='true' to relieve."
+    - alert: WALMetricsAbsent
+      expr: absent(pg_wal_size_bytes{exported_instance="__PG_INSTANCE__"})
+      for: 30m
+      labels: {component: backup, severity: warning}
+      annotations:
+        summary: "No WAL-health metrics from the PG host"
+        description: "pg-wal-health.sh cron may have stopped."

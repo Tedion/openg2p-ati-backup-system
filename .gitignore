@@ -1,0 +1,8 @@
+# rendered at install time
+monitoring/prometheusrule.rendered.yaml
+# never commit real secrets / live env
+backup.env
+.smtp
+*.pass
+am-backup*.yaml
+am-new*.yaml

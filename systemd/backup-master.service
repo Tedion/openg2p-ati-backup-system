@@ -1,0 +1,7 @@
+[Unit]
+Description=Backup master (NFS+MinIO+metrics+summary email)
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/backup/bin/master-backup.sh

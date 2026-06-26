@@ -1,0 +1,20 @@
+# /etc/pgbackrest/pgbackrest.conf  on the PG host
+# chown root:postgres, chmod 640  (no secrets; archive-push runs as postgres)
+[global]
+repo1-host=<BACKUP_HOST_IP>
+repo1-host-user=<BACKUP_USER>
+process-max=4
+compress-type=zst
+log-level-file=detail
+
+[main]                                 # <-- stanza name = $PG_STANZA
+pg1-path=/var/lib/postgresql/14/main
+pg1-port=5432
+
+# Then in postgresql.conf on the PG host (requires a Postgres RESTART for archive_mode):
+#   archive_mode = on
+#   archive_command = 'pgbackrest --stanza=main archive-push %p'
+#   wal_level = replica   (or higher; 'logical' is fine)
+# CRITICAL: test 'pgbackrest --stanza=main archive-push <wal-file>' BEFORE the restart.
+# If archive_command is broken when archive_mode turns on, WAL piles up and fills the disk,
+# stopping Postgres. Prove the push works first.
